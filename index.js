@@ -10,9 +10,14 @@ const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
+
+// Sessões ativas
 const sessions = {};
 
-async function createSession(clientId) {
+/* ==============================
+   CRIA / GARANTE SESSÃO
+================================ */
+async function getSession(clientId) {
   if (sessions[clientId]) {
     return sessions[clientId];
   }
@@ -24,7 +29,14 @@ async function createSession(clientId) {
   const sock = makeWASocket({
     auth: state,
     printQRInTerminal: true,
-    browser: ["SaaS", "Chrome", "1.0"]
+
+    // ⚠️ ESSENCIAL EM PRODUÇÃO (Railway)
+    browser: ["Chrome", "Linux", "1.0"],
+    connectTimeoutMs: 60_000,
+    defaultQueryTimeoutMs: 60_000,
+    keepAliveIntervalMs: 30_000,
+    emitOwnEvents: true,
+    markOnlineOnConnect: false
   });
 
   sessions[clientId] = {
@@ -57,7 +69,7 @@ async function createSession(clientId) {
 
       console.log(`❌ ${clientId} desconectado`, reason);
 
-      // Se NÃO for logout, remove sessão para gerar novo QR
+      // Remove sessão se não for logout manual
       if (reason !== DisconnectReason.loggedOut) {
         delete sessions[clientId];
       }
@@ -67,11 +79,14 @@ async function createSession(clientId) {
   return sessions[clientId];
 }
 
-/* ---------- ROTAS ---------- */
+/* ==============================
+   ROTAS
+================================ */
 
-// QR = ponto central do SaaS
+// QR → ponto central do SaaS
 app.get("/qr/:clientId", async (req, res) => {
-  const session = await createSession(req.params.clientId);
+  const { clientId } = req.params;
+  const session = await getSession(clientId);
 
   if (session.connected) {
     return res.json({ connected: true });
@@ -109,6 +124,9 @@ app.post("/send/:clientId", async (req, res) => {
   res.json({ sent: true });
 });
 
+/* ==============================
+   START
+================================ */
 app.listen(PORT, () => {
-  console.log("🚀 Multi-WhatsApp SaaS rodando", PORT);
+  console.log("🚀 Multi-WhatsApp SaaS FINAL rodando na porta", PORT);
 });
