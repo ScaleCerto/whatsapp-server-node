@@ -9,6 +9,20 @@ import {
 const app = express();
 app.use(express.json());
 
+/* ==============================
+   DESATIVAR CACHE (ESSENCIAL P/ QR)
+================================ */
+app.use((req, res, next) => {
+  res.setHeader(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate"
+  );
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.setHeader("Surrogate-Control", "no-store");
+  next();
+});
+
 const PORT = process.env.PORT || 3000;
 const sessions = {};
 
@@ -28,7 +42,7 @@ async function getSession(clientId) {
     auth: state,
     printQRInTerminal: true,
 
-    // ESSENCIAL EM PRODUÇÃO (Railway)
+    // ESSENCIAL EM PRODUÇÃO (Railway / Render)
     browser: ["Chrome", "Linux", "1.0"],
     connectTimeoutMs: 60_000,
     defaultQueryTimeoutMs: 60_000,
@@ -80,7 +94,7 @@ async function getSession(clientId) {
    ROTAS
 ================================ */
 
-// QR = ponto central do SaaS
+// QR
 app.get("/qr/:clientId", async (req, res) => {
   const session = await getSession(req.params.clientId);
 
