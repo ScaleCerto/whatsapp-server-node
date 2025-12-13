@@ -2,19 +2,20 @@ import express from "express";
 import QRCode from "qrcode";
 import {
   makeWASocket,
-  useMultiFileAuthState
+  useMultiFileAuthState,
+  DisconnectReason
 } from "@whiskeysockets/baileys";
 
 const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-
-// Guarda sessões ativas
 const sessions = {};
 
 async function createSession(clientId) {
-  if (sessions[clientId]) return sessions[clientId];
+  if (sessions[clientId]) {
+    return sessions[clientId];
+  }
 
   const { state, saveCreds } = await useMultiFileAuthState(
     `auth/${clientId}`
@@ -22,7 +23,8 @@ async function createSession(clientId) {
 
   const sock = makeWASocket({
     auth: state,
-    printQRInTerminal: true
+    printQRInTerminal: true,
+    browser: ["SaaS", "Chrome", "1.0"]
   });
 
   sessions[clientId] = {
@@ -34,19 +36,31 @@ async function createSession(clientId) {
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", async (update) => {
-    if (update.qr) {
-      sessions[clientId].qr = await QRCode.toDataURL(update.qr);
+    const { connection, qr, lastDisconnect } = update;
+
+    if (qr) {
+      sessions[clientId].qr = await QRCode.toDataURL(qr);
+      console.log(`📲 QR gerado para ${clientId}`);
     }
 
-    if (update.connection === "open") {
+    if (connection === "open") {
       sessions[clientId].connected = true;
       sessions[clientId].qr = null;
-      console.log(`✅ Cliente ${clientId} conectado`);
+      console.log(`✅ ${clientId} conectado`);
     }
 
-    if (update.connection === "close") {
+    if (connection === "close") {
       sessions[clientId].connected = false;
-      console.log(`❌ Cliente ${clientId} desconectado`);
+
+      const reason =
+        lastDisconnect?.error?.output?.statusCode;
+
+      console.log(`❌ ${clientId} desconectado`, reason);
+
+      // Se NÃO for logout, remove sessão para gerar novo QR
+      if (reason !== DisconnectReason.loggedOut) {
+        delete sessions[clientId];
+      }
     }
   });
 
@@ -55,24 +69,16 @@ async function createSession(clientId) {
 
 /* ---------- ROTAS ---------- */
 
-// Inicia sessão
-app.get("/connect/:clientId", async (req, res) => {
-  const { clientId } = req.params;
-  await createSession(clientId);
-  res.json({ started: true });
-});
-
-// Retorna QR
+// QR = ponto central do SaaS
 app.get("/qr/:clientId", async (req, res) => {
-  const { clientId } = req.params;
-  const session = sessions[clientId];
-
-  if (!session) {
-    return res.status(404).json({ error: "Sessão não iniciada" });
-  }
+  const session = await createSession(req.params.clientId);
 
   if (session.connected) {
     return res.json({ connected: true });
+  }
+
+  if (!session.qr) {
+    return res.json({ status: "waiting_qr" });
   }
 
   res.json({ qr: session.qr });
@@ -80,9 +86,8 @@ app.get("/qr/:clientId", async (req, res) => {
 
 // Status
 app.get("/status/:clientId", (req, res) => {
-  const session = sessions[req.params.clientId];
   res.json({
-    connected: session?.connected || false
+    connected: sessions[req.params.clientId]?.connected || false
   });
 });
 
@@ -93,7 +98,9 @@ app.post("/send/:clientId", async (req, res) => {
 
   const session = sessions[clientId];
   if (!session || !session.connected) {
-    return res.status(400).json({ error: "WhatsApp não conectado" });
+    return res.status(400).json({
+      error: "WhatsApp não conectado"
+    });
   }
 
   const jid = number.replace(/\D/g, "") + "@s.whatsapp.net";
@@ -103,5 +110,5 @@ app.post("/send/:clientId", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log("🚀 Multi-WhatsApp Server rodando na porta", PORT);
+  console.log("🚀 Multi-WhatsApp SaaS rodando", PORT);
 });
