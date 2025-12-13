@@ -36,7 +36,7 @@ async function getSession(clientId) {
     return sessions[clientId];
   }
 
-  // ✅ Garante pasta auth (Railway)
+  // garante pasta auth
   if (!fs.existsSync("auth")) {
     fs.mkdirSync("auth");
   }
@@ -45,17 +45,17 @@ async function getSession(clientId) {
     `auth/${clientId}`
   );
 
-  // ✅ VERSÃO CORRETA DO WHATSAPP WEB (ESSENCIAL)
+  // 🔴 OBRIGATÓRIO EM PRODUÇÃO
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
-    version, // 👈 MUITO IMPORTANTE
+    version, // 👈 ISSO REMOVE O ERRO "validating connection"
     auth: state,
     printQRInTerminal: false,
 
     browser: ["Chrome", "Linux", "1.0"],
 
-    syncFullHistory: false, // 👈 evita erro de validação
+    syncFullHistory: false,
     connectTimeoutMs: 60_000,
     defaultQueryTimeoutMs: 60_000,
     keepAliveIntervalMs: 25_000,
@@ -89,7 +89,9 @@ async function getSession(clientId) {
     if (connection === "close") {
       sessions[clientId].connected = false;
 
-      const reason = lastDisconnect?.error?.output?.statusCode;
+      const reason =
+        lastDisconnect?.error?.output?.statusCode;
+
       console.log(`❌ ${clientId} desconectado`, reason);
 
       if (reason !== DisconnectReason.loggedOut) {
