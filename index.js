@@ -10,8 +10,6 @@ const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-
-// Sessões ativas
 const sessions = {};
 
 /* ==============================
@@ -30,7 +28,7 @@ async function getSession(clientId) {
     auth: state,
     printQRInTerminal: true,
 
-    // ⚠️ ESSENCIAL EM PRODUÇÃO (Railway)
+    // ESSENCIAL EM PRODUÇÃO (Railway)
     browser: ["Chrome", "Linux", "1.0"],
     connectTimeoutMs: 60_000,
     defaultQueryTimeoutMs: 60_000,
@@ -69,7 +67,6 @@ async function getSession(clientId) {
 
       console.log(`❌ ${clientId} desconectado`, reason);
 
-      // Remove sessão se não for logout manual
       if (reason !== DisconnectReason.loggedOut) {
         delete sessions[clientId];
       }
@@ -83,10 +80,9 @@ async function getSession(clientId) {
    ROTAS
 ================================ */
 
-// QR → ponto central do SaaS
+// QR = ponto central do SaaS
 app.get("/qr/:clientId", async (req, res) => {
-  const { clientId } = req.params;
-  const session = await getSession(clientId);
+  const session = await getSession(req.params.clientId);
 
   if (session.connected) {
     return res.json({ connected: true });
