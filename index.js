@@ -36,7 +36,6 @@ async function getSession(clientId) {
     return sessions[clientId];
   }
 
-  // garante pasta auth
   if (!fs.existsSync("auth")) {
     fs.mkdirSync("auth");
   }
@@ -45,17 +44,23 @@ async function getSession(clientId) {
     `auth/${clientId}`
   );
 
-  // 🔴 OBRIGATÓRIO EM PRODUÇÃO
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
-    version, // 👈 ISSO REMOVE O ERRO "validating connection"
+    version,
     auth: state,
     printQRInTerminal: false,
 
     browser: ["Chrome", "Linux", "1.0"],
+    mobile: false,
 
     syncFullHistory: false,
+    retryRequestDelayMs: 250,
+
+    getMessage: async () => {
+      return undefined;
+    },
+
     connectTimeoutMs: 60_000,
     defaultQueryTimeoutMs: 60_000,
     keepAliveIntervalMs: 25_000,
@@ -107,7 +112,6 @@ async function getSession(clientId) {
    ROTAS
 ================================ */
 
-// QR
 app.get("/qr/:clientId", async (req, res) => {
   const session = await getSession(req.params.clientId);
 
@@ -122,14 +126,12 @@ app.get("/qr/:clientId", async (req, res) => {
   res.json({ qr: session.qr });
 });
 
-// Status
 app.get("/status/:clientId", (req, res) => {
   res.json({
     connected: sessions[req.params.clientId]?.connected || false
   });
 });
 
-// Enviar mensagem
 app.post("/send/:clientId", async (req, res) => {
   const { clientId } = req.params;
   const { number, message } = req.body;
