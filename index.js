@@ -40,7 +40,7 @@ async function getSession(clientId) {
 
   const sock = makeWASocket({
     auth: state,
-    printQRInTerminal: true,
+    printQRInTerminal: false, // 👈 ALTERAÇÃO AQUI (IMPORTANTE)
 
     // ESSENCIAL EM PRODUÇÃO (Railway / Render)
     browser: ["Chrome", "Linux", "1.0"],
