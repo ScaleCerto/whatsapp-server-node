@@ -10,9 +10,6 @@ import fs from "fs";
 const app = express();
 app.use(express.json());
 
-/* ==============================
-   DESATIVAR CACHE (ESSENCIAL P/ QR)
-================================ */
 app.use((req, res, next) => {
   res.setHeader(
     "Cache-Control",
@@ -27,15 +24,11 @@ app.use((req, res, next) => {
 const PORT = process.env.PORT || 3000;
 const sessions = {};
 
-/* ==============================
-   CRIA / GARANTE SESSÃO
-================================ */
 async function getSession(clientId) {
   if (sessions[clientId]) {
     return sessions[clientId];
   }
 
-  // ✅ GARANTE A PASTA auth (ESSENCIAL NO RAILWAY)
   if (!fs.existsSync("auth")) {
     fs.mkdirSync("auth");
   }
@@ -47,8 +40,6 @@ async function getSession(clientId) {
   const sock = makeWASocket({
     auth: state,
     printQRInTerminal: false,
-
-    // ESSENCIAL EM PRODUÇÃO (Railway / Render)
     browser: ["Chrome", "Linux", "1.0"],
     connectTimeoutMs: 60_000,
     defaultQueryTimeoutMs: 60_000,
@@ -81,10 +72,7 @@ async function getSession(clientId) {
 
     if (connection === "close") {
       sessions[clientId].connected = false;
-
-      const reason =
-        lastDisconnect?.error?.output?.statusCode;
-
+      const reason = lastDisconnect?.error?.output?.statusCode;
       console.log(`❌ ${clientId} desconectado`, reason);
 
       if (reason !== DisconnectReason.loggedOut) {
@@ -96,11 +84,6 @@ async function getSession(clientId) {
   return sessions[clientId];
 }
 
-/* ==============================
-   ROTAS
-================================ */
-
-// QR
 app.get("/qr/:clientId", async (req, res) => {
   const session = await getSession(req.params.clientId);
 
@@ -115,14 +98,12 @@ app.get("/qr/:clientId", async (req, res) => {
   res.json({ qr: session.qr });
 });
 
-// Status
 app.get("/status/:clientId", (req, res) => {
   res.json({
     connected: sessions[req.params.clientId]?.connected || false
   });
 });
 
-// Enviar mensagem
 app.post("/send/:clientId", async (req, res) => {
   const { clientId } = req.params;
   const { number, message } = req.body;
@@ -140,9 +121,6 @@ app.post("/send/:clientId", async (req, res) => {
   res.json({ sent: true });
 });
 
-/* ==============================
-   START
-================================ */
 app.listen(PORT, () => {
   console.log("🚀 Multi-WhatsApp SaaS FINAL rodando na porta", PORT);
 });
