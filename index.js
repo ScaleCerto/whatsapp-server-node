@@ -5,6 +5,7 @@ import {
   useMultiFileAuthState,
   DisconnectReason
 } from "@whiskeysockets/baileys";
+import fs from "fs";
 
 const app = express();
 app.use(express.json());
@@ -34,13 +35,18 @@ async function getSession(clientId) {
     return sessions[clientId];
   }
 
+  // ✅ GARANTE A PASTA auth (ESSENCIAL NO RAILWAY)
+  if (!fs.existsSync("auth")) {
+    fs.mkdirSync("auth");
+  }
+
   const { state, saveCreds } = await useMultiFileAuthState(
     `auth/${clientId}`
   );
 
   const sock = makeWASocket({
     auth: state,
-    printQRInTerminal: false, // 👈 ALTERAÇÃO AQUI (IMPORTANTE)
+    printQRInTerminal: false,
 
     // ESSENCIAL EM PRODUÇÃO (Railway / Render)
     browser: ["Chrome", "Linux", "1.0"],
