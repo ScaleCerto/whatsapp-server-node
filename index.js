@@ -108,7 +108,6 @@ app.post("/send/:clientId", async (req, res) => {
 
   res.json({ sent: true });
 });
-
 app.listen(PORT, () => {
-  console.log("🚀 Multi-WhatsApp SaaS rodando", PORT);
+  console.log("🚀 Multi-WhatsApp SaaS v2 ATIVO", PORT);
 });
