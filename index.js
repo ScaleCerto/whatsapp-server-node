@@ -7,8 +7,13 @@ import {
   fetchLatestBaileysVersion
 } from "@whiskeysockets/baileys";
 import fs from "fs";
+import http from "http";
+import { Server } from "socket.io";
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
 app.use(express.json());
 
 // ==============================
@@ -59,12 +64,15 @@ async function getSession(clientId) {
     if (qr) {
       sessions[clientId].qr = await QRCode.toDataURL(qr);
       console.log(`📲 QR gerado para ${clientId}`);
+      // Envia o QR para o cliente via WebSocket
+      io.to(clientId).emit("qr", sessions[clientId].qr);
     }
 
     if (connection === "open") {
       sessions[clientId].connected = true;
       sessions[clientId].qr = null;
       console.log(`✅ ${clientId} conectado`);
+      io.to(clientId).emit("connected", true);
     }
 
     if (connection === "close") {
@@ -73,18 +81,15 @@ async function getSession(clientId) {
       console.log(`❌ ${clientId} desconectado`, reason);
 
       if (reason === DisconnectReason.loggedOut) {
-        // remove credenciais de logout
         if (fs.existsSync(`auth/${clientId}`)) fs.rmSync(`auth/${clientId}`, { recursive: true, force: true });
         delete sessions[clientId];
       } else {
-        // tenta reconectar automaticamente após 5 segundos
         console.log(`🔄 Tentando reconectar ${clientId} em 5s...`);
         setTimeout(() => getSession(clientId), 5000);
       }
     }
   });
 
-  // Tratamento de erro genérico
   sock.ev.on("messages.upsert", async (msg) => {
     // aqui você pode processar mensagens recebidas
   });
@@ -96,7 +101,7 @@ async function getSession(clientId) {
 // ROTAS
 // ==============================
 
-// QR JSON
+// QR como JSON
 app.get("/qr/:clientId", async (req, res) => {
   try {
     const session = await getSession(req.params.clientId);
@@ -150,9 +155,59 @@ app.post("/send/:clientId", async (req, res) => {
   }
 });
 
+// Rota HTML para escanear QR no celular
+app.get("/qr-view/:clientId", async (req, res) => {
+  try {
+    const session = await getSession(req.params.clientId);
+
+    if (session.connected) return res.send("✅ WhatsApp já conectado");
+    if (!session.qr) return res.send("⏳ QR ainda não gerado, atualize a página");
+
+    res.send(`
+      <html>
+        <head>
+          <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+          <meta http-equiv="Pragma" content="no-cache" />
+          <meta http-equiv="Expires" content="0" />
+          <title>Escaneie o QR do WhatsApp</title>
+        </head>
+        <body style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;">
+          <h2>Escaneie este QR com seu WhatsApp</h2>
+          <img id="qrCode" src="${session.qr}" style="width:300px; height:300px;" />
+          <p>Se o QR expirar, atualize a página para gerar um novo.</p>
+          <script>
+            const socket = io();
+            socket.emit('join', '${req.params.clientId}');
+            socket.on('qr', (qrData) => {
+              document.getElementById('qrCode').src = qrData;
+            });
+          </script>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// Conectar ao WebSocket
+io.on("connection", (socket) => {
+  console.log("Novo cliente conectado");
+
+  socket.on('join', (clientId) => {
+    socket.join(clientId);
+    console.log(`Cliente ${clientId} conectado ao WebSocket`);
+
+    const session = sessions[clientId];
+    if (session?.qr) {
+      socket.emit("qr", session.qr);
+    }
+  });
+});
+
 // ==============================
 // INICIAR SERVIDOR
 // ==============================
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log("🚀 Multi-WhatsApp SaaS rodando na porta", PORT);
 });
