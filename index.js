@@ -1,14 +1,22 @@
 import express from "express";
 import QRCode from "qrcode";
+import fs from "fs";
+import http from "http";
+import { Server } from "socket.io";
 import {
   makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion
 } from "@whiskeysockets/baileys";
-import fs from "fs";
-import http from "http";
-import { Server } from "socket.io";
+
+// ==============================
+// LIMPAR SESSÕES ANTIGAS AUTOMATICAMENTE
+// ==============================
+if (fs.existsSync("auth")) {
+  fs.rmSync("auth", { recursive: true, force: true });
+  console.log("🗑️ Sessões antigas removidas");
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -90,7 +98,7 @@ async function getSession(clientId) {
   });
 
   sock.ev.on("messages.upsert", async (msg) => {
-    // aqui você pode processar mensagens recebidas
+    // Aqui você pode processar mensagens recebidas
   });
 
   return sessions[clientId];
