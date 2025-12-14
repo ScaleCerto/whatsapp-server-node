@@ -57,9 +57,7 @@ async function getSession(clientId) {
     syncFullHistory: false,
     retryRequestDelayMs: 250,
 
-    getMessage: async () => {
-      return undefined;
-    },
+    getMessage: async () => undefined,
 
     connectTimeoutMs: 60_000,
     defaultQueryTimeoutMs: 60_000,
@@ -112,6 +110,7 @@ async function getSession(clientId) {
    ROTAS
 ================================ */
 
+// QR EM JSON (base64 - opcional)
 app.get("/qr/:clientId", async (req, res) => {
   const session = await getSession(req.params.clientId);
 
@@ -126,17 +125,45 @@ app.get("/qr/:clientId", async (req, res) => {
   res.json({ qr: session.qr });
 });
 
+// QR COMO IMAGEM (PNG REAL)
+app.get("/qr-image/:clientId", async (req, res) => {
+  const { clientId } = req.params;
+  const session = await getSession(clientId);
+
+  if (session.connected) {
+    return res.send("✅ WhatsApp já conectado");
+  }
+
+  if (!session.qr) {
+    return res.send("⏳ QR ainda não gerado, atualize a página");
+  }
+
+  const base64Data = session.qr.replace(
+    /^data:image\/png;base64,/,
+    ""
+  );
+
+  const buffer = Buffer.from(base64Data, "base64");
+
+  res.setHeader("Content-Type", "image/png");
+  res.setHeader("Content-Length", buffer.length);
+  res.end(buffer);
+});
+
+// STATUS
 app.get("/status/:clientId", (req, res) => {
   res.json({
     connected: sessions[req.params.clientId]?.connected || false
   });
 });
 
+// ENVIAR MENSAGEM
 app.post("/send/:clientId", async (req, res) => {
   const { clientId } = req.params;
   const { number, message } = req.body;
 
   const session = sessions[clientId];
+
   if (!session || !session.connected) {
     return res.status(400).json({
       error: "WhatsApp não conectado"
