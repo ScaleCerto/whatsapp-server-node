@@ -8,7 +8,7 @@ import {
 } from "@whiskeysockets/baileys";
 import fs from "fs";
 import http from "http";
-import { Server } from "socket.io"; // ✅ Certifique-se de instalar: yarn add socket.io ou npm install socket.io
+import { Server } from "socket.io";
 
 const app = express();
 const server = http.createServer(app);
@@ -100,6 +100,7 @@ async function getSession(clientId) {
 // ROTAS
 // ==============================
 
+// QR como JSON
 app.get("/qr/:clientId", async (req, res) => {
   try {
     const session = await getSession(req.params.clientId);
@@ -111,6 +112,7 @@ app.get("/qr/:clientId", async (req, res) => {
   }
 });
 
+// QR como PNG
 app.get("/qr-image/:clientId", async (req, res) => {
   try {
     const session = await getSession(req.params.clientId);
@@ -128,10 +130,12 @@ app.get("/qr-image/:clientId", async (req, res) => {
   }
 });
 
+// Status da conexão
 app.get("/status/:clientId", (req, res) => {
   res.json({ connected: sessions[req.params.clientId]?.connected || false });
 });
 
+// Enviar mensagem
 app.post("/send/:clientId", async (req, res) => {
   try {
     const { clientId } = req.params;
@@ -150,6 +154,7 @@ app.post("/send/:clientId", async (req, res) => {
   }
 });
 
+// Rota HTML para escanear QR no celular
 app.get("/qr-view/:clientId", async (req, res) => {
   try {
     const session = await getSession(req.params.clientId);
@@ -185,9 +190,7 @@ app.get("/qr-view/:clientId", async (req, res) => {
   }
 });
 
-// ==============================
-// WEBSOCKET
-// ==============================
+// Conectar ao WebSocket
 io.on("connection", (socket) => {
   console.log("Novo cliente conectado");
 
