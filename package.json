@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Servidor multi-WhatsApp SaaS usando Baileys e Socket.io",
   "main": "index.js",
   "type": "module",
