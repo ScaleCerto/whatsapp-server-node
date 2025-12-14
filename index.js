@@ -12,7 +12,7 @@ const app = express();
 app.use(express.json());
 
 /* ==============================
-   DESATIVAR CACHE (ESSENCIAL P/ QR)
+   DESATIVAR CACHE
 ================================ */
 app.use((req, res, next) => {
   res.setHeader(
@@ -29,49 +29,30 @@ const PORT = process.env.PORT || 3000;
 const sessions = {};
 
 /* ==============================
-   CRIA / GARANTE SESSÃO
+   FUNÇÃO DE SESSÃO
 ================================ */
 async function getSession(clientId) {
-  if (sessions[clientId]) {
-    return sessions[clientId];
-  }
+  if (sessions[clientId]) return sessions[clientId];
 
-  if (!fs.existsSync("auth")) {
-    fs.mkdirSync("auth");
-  }
+  if (!fs.existsSync("auth")) fs.mkdirSync("auth");
 
-  const { state, saveCreds } = await useMultiFileAuthState(
-    `auth/${clientId}`
-  );
-
-  const { version } = await fetchLatestBaileysVersion();
+  const { state, saveCreds } = await useMultiFileAuthState(`auth/${clientId}`);
+  const { version } = await fetchLatestBaileysVersion(); // pega a versão mais recente do WhatsApp
 
   const sock = makeWASocket({
     version,
     auth: state,
     printQRInTerminal: false,
-
     browser: ["Chrome", "Linux", "1.0"],
-    mobile: false,
-
     syncFullHistory: false,
-    retryRequestDelayMs: 250,
-
-    getMessage: async () => undefined,
-
-    connectTimeoutMs: 60_000,
-    defaultQueryTimeoutMs: 60_000,
-    keepAliveIntervalMs: 25_000,
-
+    connectTimeoutMs: 60000,
+    defaultQueryTimeoutMs: 60000,
+    keepAliveIntervalMs: 25000,
     emitOwnEvents: true,
     markOnlineOnConnect: false
   });
 
-  sessions[clientId] = {
-    sock,
-    qr: null,
-    connected: false
-  };
+  sessions[clientId] = { sock, qr: null, connected: false };
 
   sock.ev.on("creds.update", saveCreds);
 
@@ -91,15 +72,11 @@ async function getSession(clientId) {
 
     if (connection === "close") {
       sessions[clientId].connected = false;
-
-      const reason =
-        lastDisconnect?.error?.output?.statusCode;
-
+      const reason = lastDisconnect?.error?.output?.statusCode;
       console.log(`❌ ${clientId} desconectado`, reason);
 
-      if (reason !== DisconnectReason.loggedOut) {
-        delete sessions[clientId];
-      }
+      // Se deu erro que não é logout, remove a sessão e tente reconectar na próxima chamada
+      if (reason !== DisconnectReason.loggedOut) delete sessions[clientId];
     }
   });
 
@@ -110,39 +87,24 @@ async function getSession(clientId) {
    ROTAS
 ================================ */
 
-// QR EM JSON (base64 - opcional)
+// QR JSON
 app.get("/qr/:clientId", async (req, res) => {
   const session = await getSession(req.params.clientId);
 
-  if (session.connected) {
-    return res.json({ connected: true });
-  }
-
-  if (!session.qr) {
-    return res.json({ status: "waiting_qr" });
-  }
+  if (session.connected) return res.json({ connected: true });
+  if (!session.qr) return res.json({ status: "waiting_qr" });
 
   res.json({ qr: session.qr });
 });
 
-// QR COMO IMAGEM (PNG REAL)
+// QR como PNG
 app.get("/qr-image/:clientId", async (req, res) => {
-  const { clientId } = req.params;
-  const session = await getSession(clientId);
+  const session = await getSession(req.params.clientId);
 
-  if (session.connected) {
-    return res.send("✅ WhatsApp já conectado");
-  }
+  if (session.connected) return res.send("✅ WhatsApp já conectado");
+  if (!session.qr) return res.send("⏳ QR ainda não gerado, atualize a página");
 
-  if (!session.qr) {
-    return res.send("⏳ QR ainda não gerado, atualize a página");
-  }
-
-  const base64Data = session.qr.replace(
-    /^data:image\/png;base64,/,
-    ""
-  );
-
+  const base64Data = session.qr.replace(/^data:image\/png;base64,/, "");
   const buffer = Buffer.from(base64Data, "base64");
 
   res.setHeader("Content-Type", "image/png");
@@ -150,25 +112,19 @@ app.get("/qr-image/:clientId", async (req, res) => {
   res.end(buffer);
 });
 
-// STATUS
+// Status da conexão
 app.get("/status/:clientId", (req, res) => {
-  res.json({
-    connected: sessions[req.params.clientId]?.connected || false
-  });
+  res.json({ connected: sessions[req.params.clientId]?.connected || false });
 });
 
-// ENVIAR MENSAGEM
+// Enviar mensagem
 app.post("/send/:clientId", async (req, res) => {
   const { clientId } = req.params;
   const { number, message } = req.body;
 
   const session = sessions[clientId];
-
-  if (!session || !session.connected) {
-    return res.status(400).json({
-      error: "WhatsApp não conectado"
-    });
-  }
+  if (!session || !session.connected)
+    return res.status(400).json({ error: "WhatsApp não conectado" });
 
   const jid = number.replace(/\D/g, "") + "@s.whatsapp.net";
   await session.sock.sendMessage(jid, { text: message });
@@ -177,8 +133,8 @@ app.post("/send/:clientId", async (req, res) => {
 });
 
 /* ==============================
-   START
+   INICIAR SERVIDOR
 ================================ */
 app.listen(PORT, () => {
-  console.log("🚀 Multi-WhatsApp SaaS FINAL rodando na porta", PORT);
+  console.log("🚀 Multi-WhatsApp SaaS rodando na porta", PORT);
 });
