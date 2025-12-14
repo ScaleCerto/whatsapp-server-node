@@ -8,7 +8,7 @@ import {
 } from "@whiskeysockets/baileys";
 import fs from "fs";
 import http from "http";
-import { Server } from "socket.io";
+import { Server } from "socket.io"; // ✅ Certifique-se de instalar: yarn add socket.io ou npm install socket.io
 
 const app = express();
 const server = http.createServer(app);
@@ -64,7 +64,6 @@ async function getSession(clientId) {
     if (qr) {
       sessions[clientId].qr = await QRCode.toDataURL(qr);
       console.log(`📲 QR gerado para ${clientId}`);
-      // Envia o QR para o cliente via WebSocket
       io.to(clientId).emit("qr", sessions[clientId].qr);
     }
 
@@ -101,7 +100,6 @@ async function getSession(clientId) {
 // ROTAS
 // ==============================
 
-// QR como JSON
 app.get("/qr/:clientId", async (req, res) => {
   try {
     const session = await getSession(req.params.clientId);
@@ -113,7 +111,6 @@ app.get("/qr/:clientId", async (req, res) => {
   }
 });
 
-// QR como PNG
 app.get("/qr-image/:clientId", async (req, res) => {
   try {
     const session = await getSession(req.params.clientId);
@@ -131,12 +128,10 @@ app.get("/qr-image/:clientId", async (req, res) => {
   }
 });
 
-// Status da conexão
 app.get("/status/:clientId", (req, res) => {
   res.json({ connected: sessions[req.params.clientId]?.connected || false });
 });
 
-// Enviar mensagem
 app.post("/send/:clientId", async (req, res) => {
   try {
     const { clientId } = req.params;
@@ -155,7 +150,6 @@ app.post("/send/:clientId", async (req, res) => {
   }
 });
 
-// Rota HTML para escanear QR no celular
 app.get("/qr-view/:clientId", async (req, res) => {
   try {
     const session = await getSession(req.params.clientId);
@@ -175,6 +169,7 @@ app.get("/qr-view/:clientId", async (req, res) => {
           <h2>Escaneie este QR com seu WhatsApp</h2>
           <img id="qrCode" src="${session.qr}" style="width:300px; height:300px;" />
           <p>Se o QR expirar, atualize a página para gerar um novo.</p>
+          <script src="/socket.io/socket.io.js"></script>
           <script>
             const socket = io();
             socket.emit('join', '${req.params.clientId}');
@@ -190,7 +185,9 @@ app.get("/qr-view/:clientId", async (req, res) => {
   }
 });
 
-// Conectar ao WebSocket
+// ==============================
+// WEBSOCKET
+// ==============================
 io.on("connection", (socket) => {
   console.log("Novo cliente conectado");
 
