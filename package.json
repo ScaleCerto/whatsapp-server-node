@@ -1,19 +1,19 @@
 {
   "name": "whatsapp-server",
   "version": "1.0.1",
-  "description": "Servidor multi-WhatsApp SaaS usando Baileys e Socket.io",
+  "description": "Servidor multi-WhatsApp SaaS usando Baileys",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18 <=20"
   },
   "dependencies": {
     "express": "^4.18.2",
     "qrcode": "^1.5.1",
-    "@whiskeysockets/baileys": "^6.17.16",
+    "baileys": "^6.7.0",
     "socket.io": "^4.8.1",
     "fs-extra": "^11.1.1"
   }
